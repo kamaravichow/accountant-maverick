@@ -12,6 +12,7 @@ organised document store (S3 or local disk) and does the work that eats an accou
 | **Chasing clients for missing bills** | Finds bank payments with no bill and 2B invoices missing from the books, tracks requests in `_context/requests.json`, and drafts one consolidated email/WhatsApp message per client. Nothing is sent automatically. |
 | **Tax arithmetic** | 28 preset formulas based on the law (below). The agent is told never to do tax maths in its head. Each result comes with a step-by-step working and its legal basis. |
 
+
 Other features:
 - **Live web research** through TinyFish Search and Fetch, limited to trusted government and professional sources, for notifications, circulars, rate changes and due-date extensions.
 - **Spreadsheets in the browser**. The agent builds workpapers with *real Excel formulas*: openpyxl writes them and the `formulas` engine evaluates them server-side. The accountant opens them in an in-browser Excel-like editor (FortuneSheet + ExcelJS), edits them and saves back to S3.
