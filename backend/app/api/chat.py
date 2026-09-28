@@ -72,6 +72,7 @@ async def run_stream(agent, company_id: str, req: ChatRequest) -> AsyncIterator[
         text += "\n\n[Files referenced by the user: " + ", ".join(req.attachments) + "]"
     ctx = AgentContext(company_id=company_id, fy=req.fy)
     seen_tool_calls: set[str] = set()
+    streamed_text = False  # did token chunks arrive for the current model step?
     try:
         async for mode, chunk in agent.astream(
             {"messages": [HumanMessage(text)]},
@@ -84,6 +85,7 @@ async def run_stream(agent, company_id: str, req: ChatRequest) -> AsyncIterator[
                 if isinstance(msg, AIMessageChunk) and meta.get("langgraph_node") == "model":
                     t = _text_of(msg.content)
                     if t:
+                        streamed_text = True
                         yield {"event": "token", "data": json.dumps({"text": t})}
             elif mode == "updates":
                 for node, update in (chunk or {}).items():
@@ -91,6 +93,9 @@ async def run_stream(agent, company_id: str, req: ChatRequest) -> AsyncIterator[
                         continue
                     for m in update.get("messages", []) or []:
                         if isinstance(m, AIMessage):
+                            # Providers/models that don't stream deliver only the final message.
+                            if node == "model" and not streamed_text and _text_of(m.content):
+                                yield {"event": "token", "data": json.dumps({"text": _text_of(m.content)})}
                             for tc in m.tool_calls or []:
                                 if tc["id"] in seen_tool_calls:
                                     continue
@@ -101,6 +106,8 @@ async def run_stream(agent, company_id: str, req: ChatRequest) -> AsyncIterator[
                             yield {"event": "tool_end", "data": json.dumps(
                                 {"id": m.tool_call_id, "name": m.name, "status": getattr(m, "status", "success"),
                                  "output": _text_of(m.content)[:4000]}, default=str)}
+                    if node == "model":
+                        streamed_text = False
                     if "todos" in update:
                         yield {"event": "todos", "data": json.dumps(update["todos"], default=str)}
         yield {"event": "done", "data": json.dumps({"thread_id": thread_id})}

@@ -74,6 +74,8 @@ def test_agent_tool_loop_over_sse(workspace):
     assert '"tds": 6000.0' in ends["calculate"]
     assert '"B2": 6000' in ends["set_spreadsheet_cells"]
     assert kinds[-1] == "done"
+    streamed = "".join(d["text"] for e, d in evs if e == "token")
+    assert "TDS is Rs 6,000" in streamed  # non-streaming model text still reaches the UI
     # system prompt carried company context + skill index
     sys_prompt = model.seen[0][0].text
     assert "Beta LLP" in sys_prompt and "gst-2b-reconciliation" in sys_prompt

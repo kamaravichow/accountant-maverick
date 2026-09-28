@@ -8,3 +8,4 @@ backend/app/static/
 data/
 .env
 *.sqlite
+*.tsbuildinfo
