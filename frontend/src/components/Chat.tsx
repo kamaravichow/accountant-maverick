@@ -125,7 +125,11 @@ export default function Chat({ companyId, fy, draft, onFilesChanged, onOpenFile 
           if (/write|move|extract|reconcile|clean|request|classify|create|set_|remember/.test(ev.data.name)) touchedFiles = true;
           patch((a) => ({ ...a, tools: a.tools.map((t) => (t.id === ev.data.id ? { ...t, output: ev.data.output, status: ev.data.status } : t)) }));
         } else if (ev.event === "todos") setTodos(ev.data);
-        else if (ev.event === "error") patch((a) => ({ ...a, text: a.text + `\n\n> ⚠️ ${ev.data.message}` }));
+        else if (ev.event === "error")
+          patch((a) => ({
+            ...a,
+            text: a.text + `\n\n> ⚠️ ${ev.data.message}` + (/model|503|api key|401/i.test(ev.data.message) ? "\n>\n> Open **⚙ Model settings** in the top bar to add an OpenAI-compatible endpoint." : ""),
+          }));
       }
     } catch (e) {
       if ((e as Error).name !== "AbortError") patch((a) => ({ ...a, text: a.text + `\n\n> ⚠️ ${(e as Error).message}` }));

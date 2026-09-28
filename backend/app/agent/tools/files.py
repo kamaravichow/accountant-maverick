@@ -49,7 +49,7 @@ def read_file(runtime: Rt, path: str, max_chars: int = 30000) -> str:
         content = [{"type": "text", "text": "Transcribe this document faithfully as markdown. Keep tables as markdown "
                                             "tables, keep every number exactly, mark unreadable parts as [illegible]."}]
         content += [{"type": "image", "base64": b64, "mime_type": mime} for mime, b64 in doc.images]
-        msg = get_model(vision=True).invoke([SystemMessage("You are a meticulous OCR engine for Indian financial documents."),
+        msg = get_model(vision=True, override=runtime.context.llm).invoke([SystemMessage("You are a meticulous OCR engine for Indian financial documents."),
                                              HumanMessage(content=content)])
         text = msg.content if isinstance(msg.content, str) else "".join(
             b.get("text", "") for b in msg.content if isinstance(b, dict))

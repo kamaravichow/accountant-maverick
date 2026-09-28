@@ -3,7 +3,6 @@ import json
 
 from fastapi.testclient import TestClient
 from langchain_core.messages import AIMessage
-from langgraph.checkpoint.memory import InMemorySaver
 from openpyxl import Workbook
 
 from tests.fake_llm import ScriptedModel
@@ -17,7 +16,7 @@ def _client(workspace, script):
     client = TestClient(app)
     client.__enter__()  # run lifespan (agent disabled without a real LLM key is fine)
     model = ScriptedModel(script=script)
-    app.state.agent = build_agent(checkpointer=InMemorySaver(), model=model)
+    app.state.agent = build_agent(checkpointer=app.state.checkpointer, model=model)
     return client, model
 
 

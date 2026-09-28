@@ -25,9 +25,43 @@ export type Entry = {
   content_type: string | null;
 };
 
-export type Health = { ok: boolean; agent: boolean; storage: string; model: string; web_search: boolean; auth: boolean };
+export type Health = { ok: boolean; agent: boolean; storage: string; model: string; web_search: boolean; auth: boolean; byo_llm?: boolean };
 
 const TOKEN_KEY = "maverick.token";
+const LLM_KEY = "maverick.llm";
+
+/** Browser-held OpenAI-compatible endpoint. Lives in sessionStorage only (cleared when the tab closes)
+ *  and is sent as headers on agent requests; the server never stores it. */
+export type LLMSettings = { baseUrl: string; apiKey: string; model: string; visionModel?: string };
+
+export function getLLM(): LLMSettings | null {
+  try {
+    const raw = sessionStorage.getItem(LLM_KEY);
+    const v = raw ? (JSON.parse(raw) as LLMSettings) : null;
+    return v && v.baseUrl && v.model ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setLLM(v: LLMSettings | null) {
+  try {
+    if (v) sessionStorage.setItem(LLM_KEY, JSON.stringify(v));
+    else sessionStorage.removeItem(LLM_KEY);
+  } catch {
+    /* storage unavailable: settings last only for this page load */
+  }
+  window.dispatchEvent(new Event("maverick-llm"));
+}
+
+function llmHeaders(v: Partial<LLMSettings> | null = getLLM()): Record<string, string> {
+  if (!v || !v.baseUrl) return {};
+  const h: Record<string, string> = { "X-LLM-Base-URL": v.baseUrl.trim() };
+  if (v.apiKey) h["X-LLM-API-Key"] = v.apiKey.trim();
+  if (v.model) h["X-LLM-Model"] = v.model.trim();
+  if (v.visionModel) h["X-LLM-Vision-Model"] = v.visionModel.trim();
+  return h;
+}
 
 export function getToken(): string {
   try {
@@ -50,10 +84,10 @@ function headers(extra: Record<string, string> = {}): Record<string, string> {
   return { ...(t ? { Authorization: `Bearer ${t}` } : {}), ...extra };
 }
 
-async function req<T>(method: string, url: string, body?: unknown): Promise<T> {
+async function req<T>(method: string, url: string, body?: unknown, extra: Record<string, string> = {}): Promise<T> {
   const r = await fetch(url, {
     method,
-    headers: headers(body !== undefined ? { "Content-Type": "application/json" } : {}),
+    headers: headers({ ...(body !== undefined ? { "Content-Type": "application/json" } : {}), ...extra }),
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   if (!r.ok) {
@@ -88,6 +122,9 @@ export const api = {
   formula: (name: string) => req<FormulaInfo & { schema: JsonSchema }>("GET", `/api/formulas/${name}`),
   runFormula: (name: string, args: unknown) => req<Record<string, unknown>>("POST", `/api/formulas/${name}`, args),
   skills: () => req<{ name: string; description: string; source: string }[]>("GET", "/api/skills"),
+  llmModels: (v: Partial<LLMSettings>) => req<string[]>("GET", "/api/llm/models", undefined, llmHeaders({ ...v, model: "" })),
+  llmTest: (v: LLMSettings) =>
+    req<{ ok: boolean; reply: string; tool_calling: boolean; warning: string | null }>("POST", "/api/llm/test", undefined, llmHeaders(v)),
 
   fileUrl(id: string, path: string, download = false) {
     const t = getToken();
@@ -173,7 +210,7 @@ export async function* streamChat(
 ): AsyncGenerator<StreamEvent> {
   const r = await fetch(`${c(companyId)}/chat`, {
     method: "POST",
-    headers: headers({ "Content-Type": "application/json", Accept: "text/event-stream" }),
+    headers: headers({ "Content-Type": "application/json", Accept: "text/event-stream", ...llmHeaders() }),
     body: JSON.stringify(body),
     signal,
   });

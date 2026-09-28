@@ -220,3 +220,15 @@ legend { text-transform: capitalize; font-size: 12px; color: var(--muted); }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
 @media (max-width: 600px) { .grid2 { grid-template-columns: 1fr; } }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+
+/* ---------- model settings ---------- */
+.button-pill { background: transparent; cursor: pointer; }
+.button-pill:hover { background: var(--panel-2); }
+.presets { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.row { display: flex; gap: 6px; align-items: center; }
+.row input { flex: 1; }
+.notice { padding: 8px 10px; border-radius: 6px; font-size: 13px; border: 1px solid var(--border); margin-top: 8px; word-break: break-word; }
+.notice.ok { border-color: var(--ok); color: var(--ok); }
+.notice.warn { border-color: var(--warn); color: var(--warn); }
+.notice.error { border-color: var(--danger); color: var(--danger); }
+.notice.busy { color: var(--muted); }

@@ -34,7 +34,7 @@ def _extract_one(ctx: AgentContext, path: str, register: str | None, hint: str |
     doc = read_document(data, path)
     if doc.kind == "unsupported":
         return {"file": path, "status": "error", "errors": doc.notes}
-    inv: Invoice = extract_invoice(doc, get_model(vision=doc.kind in ("scanned_pdf", "image")), hint)
+    inv: Invoice = extract_invoice(doc, get_model(vision=doc.kind in ("scanned_pdf", "image"), override=ctx.llm), hint)
     check = validate_invoice(inv, prof.gstins)
     sidecar = re.sub(r"\.[^.]+$", "", path) + ".extracted.json"
     cs.write_text(sidecar, json.dumps({"invoice": inv.model_dump(), "validation": check}, indent=1, default=str))
@@ -115,7 +115,7 @@ def classify_inbox(runtime: Rt, apply: bool = False, limit: int = 20) -> str:
     for e in files:
         try:
             doc = read_document(cs.read_bytes(e.path), e.name)
-            meta = classify_document(doc, get_model(vision=doc.kind in ("scanned_pdf", "image")), prof.name, prof.gstins)
+            meta = classify_document(doc, get_model(vision=doc.kind in ("scanned_pdf", "image"), override=ctx.llm), prof.name, prof.gstins)
         except Exception as exc:
             plan.append({"file": e.path, "error": str(exc)[:200]})
             continue

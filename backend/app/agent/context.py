@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from ..storage import ScopedStorage
 from ..workspace import current_fy, get_workspace
+from .llm import LLMOverride
 
 MAX_TOOL_OUTPUT = 24000
 
@@ -17,6 +18,8 @@ class AgentContext:
     company_id: str
     fy: str | None = None
     user_name: str | None = None
+    # Browser-supplied OpenAI-compatible endpoint for this run (None = server default model).
+    llm: LLMOverride | None = field(default=None, repr=False)
 
 
 def company_storage(ctx: AgentContext) -> ScopedStorage:

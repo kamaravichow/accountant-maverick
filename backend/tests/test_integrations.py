@@ -81,7 +81,7 @@ def test_invoice_extraction_pipeline(workspace, monkeypatch):
            "total_taxable_value": 30000, "total_cgst": 2700, "total_sgst_utgst": 2700, "grand_total": 35400,
            "extraction_confidence": "high"}
     model = ScriptedModel(script=[AIMessage("", tool_calls=[{"id": "x", "name": "Invoice", "args": inv}])])
-    monkeypatch.setattr(documents, "get_model", lambda vision=False: model)
+    monkeypatch.setattr(documents, "get_model", lambda vision=False, override=None: model)
 
     class RT:
         context = AgentContext(company_id=prof.id, fy="FY2025-26")

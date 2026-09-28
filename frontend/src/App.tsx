@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { api, getToken, setToken, type Company, type Health } from "./lib/api";
+import { api, getLLM, getToken, setToken, type Company, type Health } from "./lib/api";
 import FileExplorer from "./components/FileExplorer";
 import FileViewer from "./components/FileViewer";
 import Chat from "./components/Chat";
 import Calculators from "./components/Calculators";
+import ModelSettings from "./components/ModelSettings";
 
 const CALC_TAB = "__calculators__";
 const LAST_KEY = "maverick.company";
@@ -25,6 +26,14 @@ export default function App() {
   const [draft, setDraft] = useState<{ text: string; n: number } | null>(null);
   const [showNew, setShowNew] = useState(false);
   const [authError, setAuthError] = useState(false);
+  const [showModel, setShowModel] = useState(false);
+  const [llm, setLlmState] = useState(getLLM());
+
+  useEffect(() => {
+    const sync = () => setLlmState(getLLM());
+    window.addEventListener("maverick-llm", sync);
+    return () => window.removeEventListener("maverick-llm", sync);
+  }, []);
 
   async function loadCompanies(select?: string) {
     try {
@@ -116,7 +125,13 @@ export default function App() {
         <span className="spacer" />
         {health && (
           <span className="status">
-            <span className={`pill ${health.agent ? "ok" : "warn"}`} title={health.model}>{health.agent ? "Agent ready" : "Agent offline"}</span>
+            <button
+              className={`pill button-pill ${llm || health.agent ? "ok" : "warn"}`}
+              title={llm ? `Your endpoint: ${llm.baseUrl}` : `Server model: ${health.model}`}
+              onClick={() => setShowModel(true)}
+            >
+              ⚙ {llm ? `Model: ${llm.model}` : health.agent ? "Server model" : "Set up a model"}
+            </button>
             <span className={`pill ${health.web_search ? "ok" : "warn"}`}>{health.web_search ? "Live search" : "No web search"}</span>
             <span className="pill">{health.storage === "s3" ? "S3" : "Local storage"}</span>
           </span>
@@ -161,6 +176,7 @@ export default function App() {
       ) : (
         <div className="empty">Create a company to get started.</div>
       )}
+      {showModel && <ModelSettings onClose={() => setShowModel(false)} />}
       {showNew && (
         <NewCompany
           onClose={() => setShowNew(false)}

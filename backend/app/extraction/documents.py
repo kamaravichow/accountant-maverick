@@ -103,7 +103,7 @@ def extract_invoice(doc: DocContent, model, hint: str | None = None) -> Invoice:
         content.append({"type": "text", "text": "Extracted text layer:\n" + doc.text[:60000]})
     for mime, b64 in doc.images:
         content.append({"type": "image", "base64": b64, "mime_type": mime})
-    structured = model.with_structured_output(Invoice)
+    structured = model.with_structured_output(Invoice, method="function_calling")
     result = structured.invoke([SystemMessage(EXTRACT_SYSTEM), HumanMessage(content=content)])
     if isinstance(result, dict):
         result = Invoice.model_validate(result)

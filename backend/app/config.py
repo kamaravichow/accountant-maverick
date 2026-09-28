@@ -54,4 +54,9 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
+    # Export .env to the process environment too: provider SDKs (ANTHROPIC_API_KEY, OPENAI_API_KEY,
+    # AWS_* for boto3) read os.environ, not our Settings object. Real env vars take precedence.
+    from dotenv import load_dotenv
+
+    load_dotenv(".env", override=False)
     return Settings()

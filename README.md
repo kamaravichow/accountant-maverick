@@ -127,6 +127,21 @@ docker compose up --build
 - Chat threads are stored in SQLite (`CHECKPOINT_DB`) on a persistent volume. With several replicas, switch to
   a shared LangGraph checkpointer such as Postgres.
 
+### Bring your own model (OpenAI-compatible)
+
+Click **⚙ Model** in the top bar and enter a base URL, API key and model. Presets are included for OpenAI,
+OpenRouter, Groq, Together, DeepSeek, Ollama and LM Studio. **List models** and **Test connection** check the
+endpoint, including that it can make tool calls.
+
+- The settings live only in the browser tab's `sessionStorage`, which is cleared when the tab closes.
+- They are sent as `X-LLM-Base-URL` / `X-LLM-API-Key` / `X-LLM-Model` / `X-LLM-Vision-Model` headers, and
+  only to the chat and `/api/llm/*` endpoints.
+- The server builds a per-request `ChatOpenAI` for the agent and its OCR/extraction tools. It never stores or
+  logs the key; tests check that the key doesn't reach the chat database or client files.
+- A server-side `LLM_MODEL` is therefore optional. Without one, each user brings their own endpoint.
+- The model must support tool/function calling. `localhost` base URLs are resolved on the server, not on the
+  user's machine.
+
 ### Configuration
 
 | Variable | Purpose |
@@ -144,10 +159,10 @@ docker compose up --build
 cd backend && python -m pytest -q
 ```
 
-The 60 tests cover the formula expectations (hand-verified), the GSTIN checksum, the HSN/GST 2.0 rate logic, the
+The 62 tests cover the formula expectations (hand-verified), the GSTIN checksum, the HSN/GST 2.0 rate logic, the
 data cleaners, the GSTR-2B, bank, 26AS and missing-bill engines, S3 storage (moto), the TinyFish client (mock
-transport), the invoice-extraction pipeline, and a full agent run over SSE. The agent run uses a scripted
-tool-calling model, so no API key is needed.
+transport), the invoice-extraction pipeline, and a full agent run over SSE with a scripted tool-calling model, and a bring-your-own-model run against a fake
+OpenAI-compatible server. No API key is needed.
 
 ## Extending
 

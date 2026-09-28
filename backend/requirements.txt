@@ -16,3 +16,4 @@ formulas>=1.2
 pdfplumber>=0.11
 pypdfium2>=4.30
 rapidfuzz>=3.9
+python-dotenv>=1.0
