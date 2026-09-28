@@ -38,7 +38,10 @@ const parentOf = (p: string) => p.split("/").slice(0, -1).join("/");
 // Rendered as the only child of a folder whose contents haven't been fetched yet. TreeList
 // only mounts children of expanded rows, so mounting this is the signal to load the folder.
 function LazyLoad({ onMount }: { onMount: () => void }) {
-  useEffect(onMount, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Call in a block so the (promise) return value isn't treated by React as a cleanup function.
+  useEffect(() => {
+    onMount();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <span className="tree-loading">
       <Spinner size="sm" /> <Text type="supporting">Loading…</Text>
