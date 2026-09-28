@@ -1,7 +1,12 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { Toolbar } from "@astryxdesign/core/Toolbar";
+import { Button } from "@astryxdesign/core/Button";
+import { Text } from "@astryxdesign/core/Text";
+import { Download, FileSearch, Receipt } from "lucide-react";
 import { api } from "../lib/api";
+import { Loading } from "./Loading";
 // FortuneSheet + ExcelJS are large; load them only when a spreadsheet is opened.
 const SpreadsheetEditor = lazy(() => import("./SpreadsheetEditor"));
 
@@ -13,23 +18,29 @@ export default function FileViewer({ companyId, path, onAsk, onChanged }: Props)
   const e = ext(path);
   if (["xlsx", "xlsm", "csv"].includes(e))
     return (
-      <Suspense fallback={<div className="empty">Loading spreadsheet editor…</div>}>
+      <Suspense fallback={<Loading text="Loading spreadsheet editor…" />}>
         <SpreadsheetEditor companyId={companyId} path={path} onSaved={onChanged} onAsk={onAsk} />
       </Suspense>
     );
   const url = api.fileUrl(companyId, path);
   const actions = (
-    <div className="toolbar">
-      <strong className="path" title={path}>{path.split("/").pop()}</strong>
-      <span className="spacer" />
-      {["pdf", "png", "jpg", "jpeg", "webp"].includes(e) && (
+    <Toolbar
+      label="Document actions"
+      size="sm"
+      dividers={["bottom"]}
+      startContent={<Text type="label" weight="semibold" maxLines={1}>{path.split("/").pop()}</Text>}
+      endContent={
         <>
-          <button className="ghost" onClick={() => onAsk(`Extract this invoice into the purchase register: ${path}`)}>Extract invoice</button>
-          <button className="ghost" onClick={() => onAsk(`Read ${path} and summarise what it is and what I need to do.`)}>Summarise</button>
+          {["pdf", "png", "jpg", "jpeg", "webp"].includes(e) && (
+            <>
+              <Button label="Extract invoice" icon={<Receipt size={16} />} variant="ghost" onClick={() => onAsk(`Extract this invoice into the purchase register: ${path}`)} />
+              <Button label="Summarise" icon={<FileSearch size={16} />} variant="ghost" onClick={() => onAsk(`Read ${path} and summarise what it is and what I need to do.`)} />
+            </>
+          )}
+          <Button label="Download" icon={<Download size={16} />} variant="secondary" href={api.fileUrl(companyId, path, true)} />
         </>
-      )}
-      <a className="button ghost" href={api.fileUrl(companyId, path, true)}>Download</a>
-    </div>
+      }
+    />
   );
   if (e === "pdf")
     return (
@@ -61,7 +72,7 @@ function TextFile({ companyId, path, markdown }: { companyId: string; path: stri
       .then((b) => setText(new TextDecoder().decode(b.slice(0, 2_000_000))))
       .catch((err) => setText(`Error: ${err.message}`));
   }, [companyId, path]);
-  if (text === null) return <div className="empty">Loading…</div>;
+  if (text === null) return <Loading text="Loading…" />;
   if (markdown)
     return (
       <div className="doc md">
@@ -78,3 +89,4 @@ function TextFile({ companyId, path, markdown }: { companyId: string; path: stri
   }
   return <pre className="doc">{pretty}</pre>;
 }
+

@@ -2,7 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import { Workbook, type WorkbookInstance } from "@fortune-sheet/react";
 import "@fortune-sheet/react/dist/index.css";
 import type { Sheet } from "@fortune-sheet/core";
+import { Toolbar } from "@astryxdesign/core/Toolbar";
+import { Button } from "@astryxdesign/core/Button";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { Text } from "@astryxdesign/core/Text";
+import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { Download, RefreshCw, Save, Sparkles } from "lucide-react";
 import { api } from "../lib/api";
+import { Loading } from "./Loading";
 import { type LoadedBook, loadCsv, loadXlsx, saveXlsx, toCsv } from "../lib/xlsx";
 
 type Props = { companyId: string; path: string; onSaved?: () => void; onAsk?: (q: string) => void };
@@ -53,26 +60,51 @@ export default function SpreadsheetEditor({ companyId, path, onSaved, onAsk }: P
     }
   }
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        if (dirty) save();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
   function askAboutSelection() {
     const coords = ref.current?.getSelectionCoordinates?.() ?? [];
     const sheet = ref.current?.getSheet?.()?.name;
     onAsk?.(`In ${path}${sheet ? ` [${sheet}]` : ""}${coords.length ? ` range ${coords.join(", ")}` : ""}: `);
   }
 
-  if (error) return <div className="empty">Could not open spreadsheet: {error}</div>;
-  if (!book) return <div className="empty">Loading spreadsheet…</div>;
+  if (error)
+    return (
+      <div className="center-fill">
+        <EmptyState title="Could not open spreadsheet" description={error} actions={<Button label="Try again" onClick={load} />} />
+      </div>
+    );
+  if (!book) return <Loading text="Loading spreadsheet…" />;
   return (
     <div className="sheet-wrap">
-      <div className="toolbar">
-        <strong className="path" title={path}>{path.split("/").pop()}</strong>
-        <span className="muted small">Live formulas • edits stay local until saved</span>
-        <span className="spacer" />
-        {status && <span className="muted small">{status}</span>}
-        {onAsk && <button className="ghost" onClick={askAboutSelection}>Ask agent about selection</button>}
-        <button className="ghost" onClick={load} title="Reload from storage (e.g. after the agent edited it)">Reload</button>
-        <a className="button ghost" href={api.fileUrl(companyId, path, true)}>Download</a>
-        <button onClick={save} disabled={!dirty}>Save</button>
-      </div>
+      <Toolbar
+        label="Spreadsheet actions"
+        size="sm"
+        dividers={["bottom"]}
+        startContent={
+          <span className="sheet-title">
+            <Text type="label" weight="semibold" maxLines={1}>{path.split("/").pop()}</Text>
+            <Text type="supporting" size="xsm">{status || (dirty ? "Unsaved changes" : "Live formulas · edits stay local until saved")}</Text>
+          </span>
+        }
+        endContent={
+          <>
+            {onAsk && <Button label="Ask about selection" icon={<Sparkles size={16} />} variant="ghost" onClick={askAboutSelection} />}
+            <IconButton label="Reload" tooltip="Reload from storage (e.g. after the assistant edited it)" icon={<RefreshCw size={16} />} variant="ghost" onClick={load} />
+            <IconButton label="Download" tooltip="Download" icon={<Download size={16} />} variant="ghost" onClick={() => window.open(api.fileUrl(companyId, path, true), "_self")} />
+            <Button label="Save" icon={<Save size={16} />} variant="primary" onClick={save} isDisabled={!dirty} tooltip="Save (Ctrl/⌘ S)" />
+          </>
+        }
+      />
       <div className="sheet-host">
         <Workbook
           key={`${path}:${version}`}

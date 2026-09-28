@@ -1,7 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { Toolbar } from "@astryxdesign/core/Toolbar";
+import { Selector } from "@astryxdesign/core/Selector";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { Button } from "@astryxdesign/core/Button";
+import { Banner } from "@astryxdesign/core/Banner";
+import { Heading, Text } from "@astryxdesign/core/Text";
+import { Spinner } from "@astryxdesign/core/Spinner";
+import { StatusDot } from "@astryxdesign/core/StatusDot";
+import { ArrowUp, Sparkles, Square, SquarePen } from "lucide-react";
 import { api, streamChat, type HistoryMessage, type Todo } from "../lib/api";
+
+const NEW = "__new__";
 
 type ToolCall = { id: string; name: string; args: unknown; output?: string; status?: string };
 type Turn = { role: "user" | "assistant"; text: string; tools: ToolCall[] };
@@ -10,17 +21,19 @@ type Props = {
   companyId: string;
   fy: string | null;
   draft: { text: string; n: number } | null;
+  modelReady: boolean;
+  onOpenModel: () => void;
   onFilesChanged: () => void;
   onOpenFile: (path: string) => void;
 };
 
 const STARTERS = [
-  "Reconcile GSTR-2B with the purchase register for last month and list ITC at risk.",
-  "Extract all bills in 02_Purchases/Bills into the purchase register and flag errors.",
-  "Which bank payments have no bill? Draft a message to the client asking for them.",
-  "Check HSN codes and GST rates in the sales register (GST 2.0 changes).",
-  "Compare old vs new regime for salary 18 lakh, 80C 1.5 lakh, 80D 25k, HRA exemption 1.2 lakh.",
-  "What are this month's compliance due dates for this client?",
+  { title: "Reconcile GSTR-2B", text: "Reconcile GSTR-2B with the purchase register for last month and list ITC at risk." },
+  { title: "Extract bills", text: "Extract all bills in 02_Purchases/Bills into the purchase register and flag errors." },
+  { title: "Find missing bills", text: "Which bank payments have no bill? Draft a message to the client asking for them." },
+  { title: "Check HSN & rates", text: "Check HSN codes and GST rates in the sales register (GST 2.0 changes)." },
+  { title: "Old vs new regime", text: "Compare old vs new regime for salary 18 lakh, 80C 1.5 lakh, 80D 25k, HRA exemption 1.2 lakh." },
+  { title: "Due dates", text: "What are this month's compliance due dates for this client?" },
 ];
 
 const TOOL_LABEL: Record<string, string> = {
@@ -58,7 +71,7 @@ function historyToTurns(msgs: HistoryMessage[]): Turn[] {
   return turns;
 }
 
-export default function Chat({ companyId, fy, draft, onFilesChanged, onOpenFile }: Props) {
+export default function Chat({ companyId, fy, draft, modelReady, onOpenModel, onFilesChanged, onOpenFile }: Props) {
   const [threads, setThreads] = useState<{ id: string; title: string }[]>([]);
   const [threadId, setThreadId] = useState<string | null>(null);
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -128,7 +141,7 @@ export default function Chat({ companyId, fy, draft, onFilesChanged, onOpenFile 
         else if (ev.event === "error")
           patch((a) => ({
             ...a,
-            text: a.text + `\n\n> ⚠️ ${ev.data.message}` + (/model|503|api key|401/i.test(ev.data.message) ? "\n>\n> Open **⚙ Model settings** in the top bar to add an OpenAI-compatible endpoint." : ""),
+            text: a.text + `\n\n> ⚠️ ${ev.data.message}` + (/model|503|api key|401/i.test(ev.data.message) ? "\n>\n> Open **Model settings** in the top bar to add an OpenAI-compatible endpoint." : ""),
           }));
       }
     } catch (e) {
@@ -149,7 +162,7 @@ export default function Chat({ companyId, fy, draft, onFilesChanged, onOpenFile 
           code({ children, ...props }) {
             const s = String(children);
             if (isWorkspacePath(s)) {
-              return <button className="link code" onClick={() => onOpenFile(s.trim())}>{s}</button>;
+              return <button className="link-code" onClick={() => onOpenFile(s.trim())}>{s}</button>;
             }
             return <code {...props}>{children}</code>;
           },
@@ -160,24 +173,54 @@ export default function Chat({ companyId, fy, draft, onFilesChanged, onOpenFile 
     );
   }
 
+  const threadOptions = [{ value: NEW, label: "New conversation" }, ...threads.map((t) => ({ value: t.id, label: t.title }))];
+  const reset = () => (setThreadId(null), setTurns([]), setTodos([]), inputRef.current?.focus());
+
   return (
     <div className="chat">
-      <div className="chat-head">
-        <select value={threadId ?? ""} onChange={(e) => (e.target.value ? openThread(e.target.value) : (setThreadId(null), setTurns([]), setTodos([])))}>
-          <option value="">+ New conversation</option>
-          {threads.map((t) => (
-            <option key={t.id} value={t.id}>{t.title}</option>
-          ))}
-        </select>
-      </div>
-      <div className="messages" ref={listRef}>
+      <Toolbar
+        label="Conversation"
+        size="sm"
+        dividers={["bottom"]}
+        startContent={
+          <Selector
+            label="Conversation"
+            isLabelHidden
+            variant="ghost"
+            size="sm"
+            hasSearch={threads.length > 8}
+            searchPlaceholder="Find a conversation…"
+            startIcon={<Sparkles size={16} />}
+            options={threadOptions}
+            value={threadId ?? NEW}
+            isDisabled={running}
+            onChange={(v) => (v === NEW ? reset() : openThread(v))}
+          />
+        }
+        endContent={<IconButton label="New conversation" tooltip="New conversation" icon={<SquarePen size={16} />} variant="ghost" onClick={reset} isDisabled={running} />}
+      />
+      <div className="messages" ref={listRef} aria-live="polite">
         {!turns.length && (
           <div className="welcome">
-            <h2>What should we work on?</h2>
-            <p className="muted">The agent reads this client's folders, uses audited tax formulas, searches the web for current law, and writes workpapers you can edit in the spreadsheet tab.</p>
+            <div className="welcome-mark"><Sparkles size={22} /></div>
+            <Heading level={2}>What should we work on?</Heading>
+            <Text type="supporting" as="p">
+              The assistant reads this client's folders, uses audited tax formulas, searches the web for current law, and writes workpapers you can edit.
+            </Text>
+            {!modelReady && (
+              <Banner
+                status="warning"
+                title="No model configured"
+                description="Connect any OpenAI-compatible endpoint to start."
+                endContent={<Button label="Set up model" size="sm" onClick={onOpenModel} />}
+              />
+            )}
             <div className="starters">
               {STARTERS.map((s) => (
-                <button key={s} className="starter" onClick={() => send(s)}>{s}</button>
+                <button key={s.text} className="starter" onClick={() => send(s.text)} disabled={running}>
+                  <span className="starter-title">{s.title}</span>
+                  <span className="starter-text">{s.text}</span>
+                </button>
               ))}
             </div>
           </div>
@@ -186,59 +229,84 @@ export default function Chat({ companyId, fy, draft, onFilesChanged, onOpenFile 
           <div key={i} className={`turn ${t.role}`}>
             {t.tools.length > 0 && (
               <div className="tools">
-                {t.tools.map((tc) => (
-                  <details key={tc.id} className={`tool ${tc.output === undefined ? "running" : tc.status === "error" ? "failed" : "done"}`}>
-                    <summary>
-                      <span className="dot" />
-                      {TOOL_LABEL[tc.name] ?? tc.name}
-                      <span className="muted small"> {summarizeArgs(tc.args)}</span>
-                    </summary>
-                    <div className="tool-body">
-                      <div className="muted small">{tc.name} input</div>
-                      <pre>{JSON.stringify(tc.args, null, 1)}</pre>
-                      {tc.output !== undefined && (
-                        <>
-                          <div className="muted small">output</div>
-                          <pre>{tc.output}</pre>
-                        </>
-                      )}
-                    </div>
-                  </details>
-                ))}
+                {t.tools.map((tc) => {
+                  const state = tc.output === undefined ? "running" : tc.status === "error" ? "failed" : "done";
+                  return (
+                    <details key={tc.id} className={`tool ${state}`}>
+                      <summary>
+                        {state === "running" ? (
+                          <Spinner size="sm" />
+                        ) : (
+                          <StatusDot variant={state === "failed" ? "error" : "success"} label={state === "failed" ? "Failed" : "Done"} />
+                        )}
+                        <span className="tool-name">{TOOL_LABEL[tc.name] ?? tc.name}</span>
+                        <span className="tool-arg">{summarizeArgs(tc.args)}</span>
+                      </summary>
+                      <div className="tool-body">
+                        <Text type="supporting">{tc.name} input</Text>
+                        <pre>{JSON.stringify(tc.args, null, 1)}</pre>
+                        {tc.output !== undefined && (
+                          <>
+                            <Text type="supporting">Output</Text>
+                            <pre>{tc.output}</pre>
+                          </>
+                        )}
+                      </div>
+                    </details>
+                  );
+                })}
               </div>
             )}
-            {t.text ? <div className="bubble">{renderText(t.text)}</div> : t.role === "assistant" && running && i === turns.length - 1 && <div className="bubble muted">Working…</div>}
+            {t.text ? (
+              <div className="bubble">{renderText(t.text)}</div>
+            ) : (
+              t.role === "assistant" && running && i === turns.length - 1 && (
+                <div className="bubble thinking"><Spinner size="sm" /> <Text type="supporting">Working…</Text></div>
+              )
+            )}
           </div>
         ))}
         {todos.length > 0 && (
           <div className="todos">
-            <div className="muted small">Plan</div>
+            <Text type="label" weight="semibold">Plan</Text>
             {todos.map((td, i) => (
-              <div key={i} className={`todo ${td.status}`}>{td.status === "completed" ? "✓" : td.status === "in_progress" ? "◐" : "○"} {td.content}</div>
+              <div key={i} className={`todo ${td.status}`}>
+                <span className="todo-mark" aria-hidden>{td.status === "completed" ? "✓" : td.status === "in_progress" ? "◐" : "○"}</span> {td.content}
+              </div>
             ))}
           </div>
         )}
       </div>
-      <div className="composer">
+      <form
+        className="composer"
+        onSubmit={(e) => {
+          e.preventDefault();
+          send();
+        }}
+      >
         <textarea
           ref={inputRef}
           value={input}
-          placeholder="Ask Maverick… (Shift+Enter for a new line)"
+          aria-label="Message the assistant"
+          placeholder="Ask Maverick anything about this client…"
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault();
               send();
             }
           }}
-          rows={3}
+          rows={2}
         />
-        {running ? (
-          <button className="danger" onClick={() => abortRef.current?.abort()}>Stop</button>
-        ) : (
-          <button onClick={() => send()} disabled={!input.trim()}>Send</button>
-        )}
-      </div>
+        <div className="composer-bar">
+          <Text type="supporting" size="xsm">{fy ? `${fy} · ` : ""}Enter to send · Shift+Enter for new line</Text>
+          {running ? (
+            <IconButton label="Stop" tooltip="Stop" icon={<Square size={14} fill="currentColor" />} variant="secondary" size="sm" onClick={() => abortRef.current?.abort()} />
+          ) : (
+            <IconButton label="Send" tooltip="Send (Enter)" icon={<ArrowUp size={16} />} variant="primary" size="sm" isDisabled={!input.trim()} onClick={() => send()} />
+          )}
+        </div>
+      </form>
     </div>
   );
 }
