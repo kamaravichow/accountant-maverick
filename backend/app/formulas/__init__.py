@@ -11,7 +11,7 @@ from typing import Any, Callable
 
 from pydantic import BaseModel
 
-from . import business, capital_gains, depreciation, gst, income_tax, interest, payroll, tds
+from . import business, calendar, capital_gains, depreciation, gst, income_tax, interest, payroll, tds
 
 
 @dataclass(frozen=True)
@@ -83,6 +83,8 @@ _F = [
     Formula("hra_exemption", payroll.hra_exemption, payroll.HRAInput, "HRA exemption u/s 10(13A).", "Payroll"),
     Formula("labour_code_wages", payroll.labour_code_wages, payroll.LabourCodeWagesInput,
             "'Wages' under the labour codes (50% exclusion cap) for PF/gratuity base.", "Payroll"),
+    Formula("compliance_calendar", calendar.compliance_calendar, calendar.CalendarInput,
+            "Statutory due dates (GST, TDS, PF/ESI, advance tax, ITR, audit, ROC) for a FY or month.", "Compliance"),
 ]
 
 FORMULAS: dict[str, Formula] = {f.name: f for f in _F}
