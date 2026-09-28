@@ -116,6 +116,47 @@ docker compose up --build
 # app: http://localhost:8000   MinIO console: http://localhost:9001
 ```
 
+### Deploy on Railway
+
+The repo includes `railway.json`, which sets the Dockerfile builder, the `/api/health` healthcheck, a restart
+policy and watch paths. The Dockerfile binds to Railway's `$PORT` and trusts its proxy headers.
+
+1. **New Project → Deploy from GitHub repo** and pick this repository. Railway finds `railway.json` and builds the
+   Dockerfile (UI and API in one service).
+2. **Add a volume** to the service (right-click the service → *Attach volume*), mount path `/data`. It stores
+   the SQLite chat history and, with local storage, the client files. The entrypoint uses Railway's
+   `RAILWAY_VOLUME_MOUNT_PATH` automatically and fixes the volume's root ownership before dropping to a non-root
+   user, so `RAILWAY_RUN_UID` isn't needed.
+3. **Variables** (service → *Variables*):
+
+   | Variable | Value |
+   |---|---|
+   | `APP_TOKEN` | a long random string. **Strongly recommended**, because the Railway URL is public |
+   | `LLM_MODEL` + `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | optional server model. Without one, each user sets their own OpenAI-compatible endpoint under **⚙ Model** |
+   | `TINYFISH_API_KEY` | live web search/fetch |
+   | `STORAGE_BACKEND` | `local` (files on the volume) or `s3` (see below) |
+
+4. **Generate a domain** (service → *Settings → Networking*) and open it.
+
+**Client files in a Railway Bucket (optional, recommended for large practices):** create a Bucket in the
+project, set `STORAGE_BACKEND=s3`, and map the bucket's credentials into the service with reference variables:
+
+| App variable | From the bucket's credentials |
+|---|---|
+| `S3_BUCKET` | bucket name |
+| `S3_ENDPOINT_URL` | endpoint |
+| `S3_REGION` | region |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | access key id / secret access key |
+
+Use the syntax `${{<BucketServiceName>.<VARIABLE>}}` with the names shown in the bucket's *Credentials* tab.
+If the bucket rejects path-style requests, set `S3_ADDRESSING_STYLE=virtual`. The volume is still needed for chat
+history. When the browser can't PUT straight to the bucket (bucket CORS), uploads fall back to going through the
+server (up to `MAX_UPLOAD_MB`, default 50).
+
+Notes:
+- Run a **single replica**. Railway volumes attach to one instance, and chat history is SQLite.
+- Streaming chat uses SSE with a 15 s keep-alive ping, which works through Railway's proxy.
+
 ### Production on AWS
 
 - Build the `Dockerfile` image and run it on ECS Fargate, App Runner or any container host. Set

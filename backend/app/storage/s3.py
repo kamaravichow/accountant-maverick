@@ -20,6 +20,7 @@ class S3Storage(Storage):
         endpoint_url: str | None = None,
         presign_expiry: int = 3600,
         client=None,
+        addressing_style: str = "auto",
     ):
         self.bucket = bucket
         self.prefix = clean_path(prefix)
@@ -28,7 +29,8 @@ class S3Storage(Storage):
             "s3",
             region_name=region,
             endpoint_url=endpoint_url,
-            config=Config(signature_version="s3v4", retries={"max_attempts": 5, "mode": "standard"}),
+            config=Config(signature_version="s3v4", retries={"max_attempts": 5, "mode": "standard"},
+                          s3={"addressing_style": addressing_style}),
         )
 
     # key <-> relative path -------------------------------------------------
@@ -39,10 +41,18 @@ class S3Storage(Storage):
         return key[len(self.prefix) :].lstrip("/") if self.prefix else key
 
     def ensure_bucket(self) -> None:
+        """Create the bucket if missing (MinIO dev). Managed buckets (Railway, R2) already exist and may
+        not allow CreateBucket - never fail startup over it."""
         try:
             self.s3.head_bucket(Bucket=self.bucket)
         except ClientError:
-            self.s3.create_bucket(Bucket=self.bucket)
+            try:
+                self.s3.create_bucket(Bucket=self.bucket)
+            except ClientError as exc:
+                import logging
+
+                logging.getLogger("maverick").warning("Could not verify/create bucket %s: %s", self.bucket,
+                                                      exc.response.get("Error", {}).get("Code"))
 
     # listing ---------------------------------------------------------------
     def list(self, prefix: str = "", recursive: bool = False) -> list[Entry]:

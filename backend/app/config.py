@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     s3_region: str | None = None
     # Set for MinIO / R2 / other S3-compatible endpoints.
     s3_endpoint_url: str | None = None
+    # "path" for MinIO/most self-hosted S3; "virtual" for AWS/Railway Buckets if path-style is refused.
+    s3_addressing_style: Literal["auto", "path", "virtual"] = "auto"
     s3_presign_expiry_seconds: int = 3600
     max_upload_mb: int = 50
 

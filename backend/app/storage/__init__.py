@@ -27,6 +27,7 @@ def get_storage() -> Storage:
             region=s.s3_region,
             endpoint_url=s.s3_endpoint_url,
             presign_expiry=s.s3_presign_expiry_seconds,
+            addressing_style=s.s3_addressing_style,
         )
         if s.s3_endpoint_url:  # MinIO/dev: create the bucket on first run
             store.ensure_bucket()

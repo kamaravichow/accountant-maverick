@@ -154,9 +154,12 @@ export const api = {
           content_type: f.type || "application/octet-stream",
         });
         if (p.url) {
-          const r = await fetch(p.url, { method: "PUT", body: f, headers: { "Content-Type": f.type || "application/octet-stream" } });
-          if (!r.ok) throw new Error(`S3 upload failed for ${f.name}`);
-          continue;
+          try {
+            const r = await fetch(p.url, { method: "PUT", body: f, headers: { "Content-Type": f.type || "application/octet-stream" } });
+            if (r.ok) continue;
+          } catch {
+            /* bucket CORS may block direct browser PUTs (e.g. managed buckets) - fall back to the server */
+          }
         }
       }
       small.push(f);
